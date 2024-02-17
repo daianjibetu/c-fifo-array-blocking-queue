@@ -1,6 +1,6 @@
 # C FIFO Array Blocking Queue Integer
 
-To use this blocking queue, define `C_FEK_ARRAY_BLOCKING_QUEUE_INTEGER_IMPLEMENTATION` before including blocking_queue.h in one of your source files.
+To use this blocking queue, define `C_FEK_ARRAY_BLOCKING_QUEUE_INTEGER_IMPLEMENTATION` before including array_blocking_queue_integer.h in one of your source files.
 
 To use this blocking queue, you MUST link your binary with pthread.
 
@@ -39,11 +39,11 @@ An usage example:
 ```c
 #define C_FEK_ARRAY_BLOCKING_QUEUE_INTEGER_IMPLEMENTATION
 #define C_FEK_FAIR_LOCK_IMPLEMENTATION
-#include "blocking_queue.h"
+#include "array_blocking_queue_integer.h"
 #include <assert.h>
 
 int main() {
-	Blocking_Queue bq;
+	Array_Blocking_Queue_Integer bq;
 	int aux;
 
 	blocking_queue_init(&bq, 4);
