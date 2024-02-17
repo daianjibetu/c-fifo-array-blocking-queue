@@ -1,5 +1,5 @@
-#ifndef C_FEK_BLOCKING_QUEUE
-#define C_FEK_BLOCKING_QUEUE
+#ifndef C_FEK_ARRAY_BLOCKING_QUEUE_INTEGER
+#define C_FEK_ARRAY_BLOCKING_QUEUE_INTEGER
 
 /*
 	Author: Felipe Einsfeld Kersting
@@ -26,7 +26,7 @@
 	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 	SOFTWARE.
 
-	To use this blocking queue, define C_FEK_BLOCKING_QUEUE_IMPLEMENTATION before including blocking_queue.h in one of your source files.
+	To use this blocking queue, define C_FEK_ARRAY_BLOCKING_QUEUE_INTEGER_IMPLEMENTATION before including blocking_queue.h in one of your source files.
 
 	To use this blocking queue, you must link your binary with pthread.
 
@@ -48,7 +48,7 @@
 
 	If FIFO is not needed in your implementation, consider using a queue with no such guarantee.
 
-	Define C_FEK_BLOCKING_QUEUE_NO_CRT if you don't want the C Runtime Library included. If this is defined, you must provide
+	Define C_FEK_ARRAY_BLOCKING_QUEUE_INTEGER_NO_CRT if you don't want the C Runtime Library included. If this is defined, you must provide
 	implementations for the following functions:
 
 	void* malloc(unsigned int size)
@@ -59,7 +59,7 @@
 
 	An usage example:
 
-	#define C_FEK_BLOCKING_QUEUE_IMPLEMENTATION
+	#define C_FEK_ARRAY_BLOCKING_QUEUE_INTEGER_IMPLEMENTATION
 	#define C_FEK_FAIR_LOCK_IMPLEMENTATION
 	#include "blocking_queue.h"
 	#include <assert.h>
@@ -86,7 +86,7 @@
 
 	Another example - more similar to a real use-case - since this time the integer is allocated:
 
-	#define C_FEK_BLOCKING_QUEUE_IMPLEMENTATION
+	#define C_FEK_ARRAY_BLOCKING_QUEUE_INTEGER_IMPLEMENTATION
 	#define C_FEK_FAIR_LOCK_IMPLEMENTATION
 	#include "blocking_queue.h"
 	#include <assert.h>
@@ -140,8 +140,8 @@ typedef struct {
 	// Cond used to wake up blocked callers
 	pthread_cond_t cond;
 	// The queue of elements. It has a fixed size and is allocated in the init call.
-	// This is a circular queue. The front and the rear of the queue are given by queue_front and queue_rear
-	void** queue;
+	// This is a array queue. The front and the rear of the queue are given by queue_front and queue_rear
+	int* queue;
 	// The capacity of the queue
 	unsigned int queue_capacity;
 	// Number of elements currently in the queue.
@@ -150,8 +150,6 @@ typedef struct {
 	unsigned int queue_front;
 	// The rear of the queue
 	unsigned int queue_rear;
-	// If true, the queue does not have a maximum capacity
-	int is_boundless;
 	// Number of active callers. Used mainly to synchronize the destroy process.
 	int active_callers_count;
 	// Indicates whether the queue was closed.
@@ -181,7 +179,7 @@ int blocking_queue_init(Blocking_Queue* bq, unsigned int capacity);
 // * BQ_ERROR if an error happened
 // * BQ_FULL if the there is no space in the blocking queue
 // * BQ_CLOSED if the blocking queue was closed while the call was blocked
-int blocking_queue_add(Blocking_Queue* bq, void* element);
+int blocking_queue_add(Blocking_Queue* bq, int element);
 // Puts an element to the blocking queue
 // The element is given by 'element'
 // This function may block the caller.
@@ -191,7 +189,7 @@ int blocking_queue_add(Blocking_Queue* bq, void* element);
 // * 0 if success
 // * BQ_ERROR if an error happened
 // * BQ_CLOSED if the blocking queue was closed while the call was blocked
-int blocking_queue_put(Blocking_Queue* bq, void* element);
+int blocking_queue_put(Blocking_Queue* bq, int element);
 // Poll an element from the blocking queue
 // The element is stored in '*element'
 // This function does NOT block the caller.
@@ -202,7 +200,7 @@ int blocking_queue_put(Blocking_Queue* bq, void* element);
 // * BQ_ERROR if an error happened
 // * BQ_EMPTY if the blocking queue is empty
 // * BQ_CLOSED if the blocking queue was closed while the call was blocked
-int blocking_queue_poll(Blocking_Queue* bq, void* element);
+int blocking_queue_poll(Blocking_Queue* bq, int* element);
 // Take an element from the blocking queue
 // The element is stored in '*element'
 // This function may block the caller.
@@ -212,7 +210,7 @@ int blocking_queue_poll(Blocking_Queue* bq, void* element);
 // * 0 if success
 // * BQ_ERROR if an error happened
 // * BQ_CLOSED if the blocking queue was closed while the call was blocked
-int blocking_queue_take(Blocking_Queue* bq, void* element);
+int blocking_queue_take(Blocking_Queue* bq, int* element);
 // Closes the blocking queue.
 // When a blocking queue is closed, all _add/_put/_poll/_take calls will immediately return BQ_CLOSED if called.
 // If there are active callers blocked in one of these calls, they will also be immediately unblocked and receive BQ_CLOSED.
@@ -232,8 +230,8 @@ void blocking_queue_close(Blocking_Queue* bq);
 // NOTE: This function can only be called a single time for a given blocking queue. Calling it multiple times will cause undefined behavior.
 void blocking_queue_destroy(Blocking_Queue* bq);
 
-#ifdef C_FEK_BLOCKING_QUEUE_IMPLEMENTATION
-#if !defined(C_FEK_BLOCKING_QUEUE_NO_CRT)
+#ifdef C_FEK_ARRAY_BLOCKING_QUEUE_INTEGER_IMPLEMENTATION
+#if !defined(C_FEK_ARRAY_BLOCKING_QUEUE_INTEGER_NO_CRT)
 #include <stdlib.h>
 #include <memory.h>
 #endif
@@ -291,10 +289,8 @@ int blocking_queue_init(Blocking_Queue* bq, unsigned int capacity)
 
 	if (capacity <= 0) {
 		bq->queue_capacity = 1;
-		bq->is_boundless = 1;
 	} else {
 		bq->queue_capacity = capacity;
-		bq->is_boundless = 0;
 	}
 	bq->queue_size = 0;
 	bq->queue_front = 0;
@@ -303,7 +299,7 @@ int blocking_queue_init(Blocking_Queue* bq, unsigned int capacity)
 	bq->active_callers_count = 0;
 	bq->get_lock_are_weak_locks_blocked = 0;
 	bq->add_lock_are_weak_locks_blocked = 0;
-	bq->queue = (void**)malloc(bq->queue_capacity * sizeof(void*));
+	bq->queue = (int*)malloc(bq->queue_capacity * sizeof(int));
 	if (bq->queue == NULL)
 	{
 		pthread_mutex_destroy(&bq->mutex);
@@ -348,20 +344,18 @@ void blocking_queue_destroy(Blocking_Queue* bq) {
 	pthread_mutex_destroy(&bq->close_mutex);
 }
 
-static void enqueue(Blocking_Queue *bq, void *element) {
+static void enqueue(Blocking_Queue *bq, int element) {
 	//assert(bq->queue_size < bq->queue_capacity);
 	bq->queue_rear = (bq->queue_rear + 1) % bq->queue_capacity;
 	bq->queue[bq->queue_rear] = element;
 	bq->queue_size = bq->queue_size + 1;
 }
 
-static void *dequeue(Blocking_Queue *bq) {
-  //assert(bq->queue_size > 0);
-
-  void* element = bq->queue[bq->queue_front];
-  bq->queue_front = (bq->queue_front + 1) % bq->queue_capacity;
-  bq->queue_size = bq->queue_size - 1;
-  return element;
+static void dequeue(Blocking_Queue *bq, int* element) {
+	//assert(bq->queue_size > 0);
+	*element = bq->queue[bq->queue_front];
+	bq->queue_front = (bq->queue_front + 1) % bq->queue_capacity;
+	bq->queue_size = bq->queue_size - 1;
 }
 
 static void increase_active_callers_count(Blocking_Queue* bq) {
@@ -377,29 +371,7 @@ static void decrease_active_callers_count(Blocking_Queue* bq) {
 	pthread_mutex_unlock(&bq->active_callers_mutex);
 }
 
-static int grow_queue(Blocking_Queue* bq) {
-	unsigned int new_capacity = bq->queue_capacity * 2u;
-	void** new_queue = (void**)malloc(new_capacity * sizeof(void*));
-	if (new_queue == NULL) {
-		return 1;
-	}
-
-	if (bq->queue_rear >= bq->queue_front) {
-		memcpy(new_queue, bq->queue + bq->queue_front, bq->queue_size * sizeof(void*));
-	} else if (bq->queue_front > bq->queue_rear) {
-		memcpy(new_queue, bq->queue + bq->queue_front, (bq->queue_capacity - bq->queue_front) * sizeof(void*));
-		memcpy(new_queue + (bq->queue_capacity - bq->queue_front), bq->queue, (bq->queue_rear + 1) * sizeof(void*));
-	}
-
-	free(bq->queue);
-	bq->queue = new_queue;
-	bq->queue_capacity = new_capacity;
-	bq->queue_front = 0;
-	bq->queue_rear = bq->queue_size - 1;
-	return 0;
-}
-
-int blocking_queue_add_internal(Blocking_Queue* bq, void* element, int async) {
+int blocking_queue_add_internal(Blocking_Queue* bq, int element, int async) {
 	increase_active_callers_count(bq);
 
 	int lock_ret;
@@ -429,33 +401,24 @@ int blocking_queue_add_internal(Blocking_Queue* bq, void* element, int async) {
 	}
 
 	if (bq->queue_size == bq->queue_capacity) {
-		if (bq->is_boundless) {
-			if (grow_queue(bq)) {
-				fair_lock_unlock(&bq->add_lock);
-				pthread_mutex_unlock(&bq->mutex);
-				decrease_active_callers_count(bq);
-				return BQ_ERROR;
-			}
-		} else {
-			if (!bq->add_lock_are_weak_locks_blocked) {
-				fair_lock_block_weak_locks(&bq->add_lock);
-				bq->add_lock_are_weak_locks_blocked = 1;
-			}
-			if (async) {
-				fair_lock_unlock(&bq->add_lock);
-				pthread_mutex_unlock(&bq->mutex);
-				decrease_active_callers_count(bq);
-				return BQ_FULL;
-			}
-			pthread_cond_wait(&bq->cond, &bq->mutex);
-			if (bq->closed) {
-				fair_lock_unlock(&bq->add_lock);
-				pthread_mutex_unlock(&bq->mutex);
-				decrease_active_callers_count(bq);
-				return BQ_CLOSED;
-			}
-			//assert(bq->queue_size < bq->queue_capacity);
+		if (!bq->add_lock_are_weak_locks_blocked) {
+			fair_lock_block_weak_locks(&bq->add_lock);
+			bq->add_lock_are_weak_locks_blocked = 1;
 		}
+		if (async) {
+			fair_lock_unlock(&bq->add_lock);
+			pthread_mutex_unlock(&bq->mutex);
+			decrease_active_callers_count(bq);
+			return BQ_FULL;
+		}
+		pthread_cond_wait(&bq->cond, &bq->mutex);
+		if (bq->closed) {
+			fair_lock_unlock(&bq->add_lock);
+			pthread_mutex_unlock(&bq->mutex);
+			decrease_active_callers_count(bq);
+			return BQ_CLOSED;
+		}
+		//assert(bq->queue_size < bq->queue_capacity);
 	}
 	if (bq->get_lock_are_weak_locks_blocked) {
 		fair_lock_allow_weak_locks(&bq->get_lock);
@@ -472,7 +435,7 @@ int blocking_queue_add_internal(Blocking_Queue* bq, void* element, int async) {
 	return 0;
 }
 
-int blocking_queue_get_internal(Blocking_Queue* bq, int async, void* element) {
+int blocking_queue_get_internal(Blocking_Queue* bq, int async, int* element) {
 	increase_active_callers_count(bq);
 
 	int lock_ret;
@@ -526,7 +489,7 @@ int blocking_queue_get_internal(Blocking_Queue* bq, int async, void* element) {
 		bq->add_lock_are_weak_locks_blocked = 0;
 	}
 	pthread_cond_signal(&bq->cond);
-	*(void**)element = dequeue(bq);
+	dequeue(bq, element);
 	pthread_mutex_unlock(&bq->mutex);
 
 	fair_lock_unlock(&bq->get_lock);
@@ -536,19 +499,19 @@ int blocking_queue_get_internal(Blocking_Queue* bq, int async, void* element) {
 	return 0;
 }
 
-int blocking_queue_add(Blocking_Queue* bq, void* element) {
+int blocking_queue_add(Blocking_Queue* bq, int element) {
 	return blocking_queue_add_internal(bq, element, 1);
 }
 
-int blocking_queue_put(Blocking_Queue* bq, void* element) {
+int blocking_queue_put(Blocking_Queue* bq, int element) {
 	return blocking_queue_add_internal(bq, element, 0);
 }
 
-int blocking_queue_poll(Blocking_Queue* bq, void* element) {
+int blocking_queue_poll(Blocking_Queue* bq, int* element) {
 	return blocking_queue_get_internal(bq, 1, element);
 }
 
-int blocking_queue_take(Blocking_Queue* bq, void* element) {
+int blocking_queue_take(Blocking_Queue* bq, int* element) {
 	return blocking_queue_get_internal(bq, 0, element);
 }
 
