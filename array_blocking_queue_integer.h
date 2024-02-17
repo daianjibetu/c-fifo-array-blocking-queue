@@ -346,7 +346,10 @@ void blocking_queue_destroy(Blocking_Queue* bq) {
 
 static void enqueue(Blocking_Queue *bq, int element) {
 	//assert(bq->queue_size < bq->queue_capacity);
-	bq->queue_rear = (bq->queue_rear + 1) % bq->queue_capacity;
+	if ((bq->queue_capacity & (bq->queue_capacity - 1)) == 0)
+		bq->queue_rear = (bq->queue_rear + 1) & (bq->queue_capacity - 1);
+	else
+		bq->queue_rear = (bq->queue_rear + 1) % bq->queue_capacity;
 	bq->queue[bq->queue_rear] = element;
 	bq->queue_size = bq->queue_size + 1;
 }
@@ -354,7 +357,10 @@ static void enqueue(Blocking_Queue *bq, int element) {
 static void dequeue(Blocking_Queue *bq, int* element) {
 	//assert(bq->queue_size > 0);
 	*element = bq->queue[bq->queue_front];
-	bq->queue_front = (bq->queue_front + 1) % bq->queue_capacity;
+	if ((bq->queue_capacity & (bq->queue_capacity - 1)) == 0)
+		bq->queue_front = (bq->queue_front + 1) & (bq->queue_capacity - 1);
+	else
+		bq->queue_front = (bq->queue_front + 1) % bq->queue_capacity;
 	bq->queue_size = bq->queue_size - 1;
 }
 
